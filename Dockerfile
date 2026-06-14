@@ -2,7 +2,7 @@
 #
 # Isaac Sim is intentionally NOT installed here. Install Isaac Sim 5.1 manually later.
 # This image prepares Ubuntu 22.04, CUDA-capable Vast base, XFCE/noVNC desktop,
-# ROS2 Humble, Foxglove bridge, and helper scripts.
+# ROS2 Humble, Foxglove bridge, SSH, and helper scripts.
 
 ARG BASE_IMAGE=vastai/base-image:cuda-12.8.1-cudnn-devel-ubuntu22.04
 FROM ${BASE_IMAGE}
@@ -46,8 +46,49 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     python3-dev \
+    openssh-server \
     && locale-gen en_US en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
+
+# Ensure OpenSSH is available even when the custom image does not inherit Vast's
+# SSH startup cleanly. Vast normally injects/uses root SSH keys at runtime.
+RUN mkdir -p /run/sshd /root/.ssh && \
+    chmod 700 /root/.ssh && \
+    ssh-keygen -A && \
+    sed -ri 's/^#?PermitRootLogin .*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -ri 's/^#?PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -ri 's/^#?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config && \
+    grep -q '^PermitRootLogin ' /etc/ssh/sshd_config || echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && \
+    grep -q '^PubkeyAuthentication ' /etc/ssh/sshd_config || echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && \
+    grep -q '^PasswordAuthentication ' /etc/ssh/sshd_config || echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config
+
+RUN cat <<'EOF' >/usr/local/bin/start_sshd.sh
+#!/usr/bin/env bash
+set -euo pipefail
+mkdir -p /run/sshd /root/.ssh
+chmod 700 /root/.ssh || true
+ssh-keygen -A >/dev/null 2>&1 || true
+
+# If Vast/base image already started sshd, keep this supervisor program alive
+# instead of starting a second daemon on the same port.
+if pgrep -x sshd >/dev/null 2>&1; then
+  echo "sshd is already running; keeping custom_sshd supervisor task alive"
+  exec tail -f /dev/null
+fi
+
+exec /usr/sbin/sshd -D -e
+EOF
+RUN chmod +x /usr/local/bin/start_sshd.sh && \
+    mkdir -p /etc/supervisor/conf.d && \
+    cat <<'EOF' >/etc/supervisor/conf.d/custom_sshd.conf
+[program:custom_sshd]
+command=/usr/local/bin/start_sshd.sh
+autostart=true
+autorestart=true
+startsecs=3
+stdout_logfile=/var/log/custom_sshd.log
+stderr_logfile=/var/log/custom_sshd.err
+EOF
 
 # Enable Ubuntu universe before installing desktop/noVNC packages.
 RUN add-apt-repository universe -y && \
@@ -150,6 +191,6 @@ alias foxglove='start_foxglove.sh'
 alias verify_ros='verify_ros_gpu.sh'
 EOF
 
-EXPOSE 5900 6080 8765 9090
+EXPOSE 22 5900 6080 8765 9090
 
 WORKDIR /workspaces
