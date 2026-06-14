@@ -1,157 +1,169 @@
-# Vast.ai Desktop + Isaac ROS 3.2 + ROS2 Humble
+# Vast.ai Desktop + ROS2 Humble + Foxglove
 
-이 프로젝트는 Vast.ai의 Linux Desktop 컨테이너 이미지를 베이스로 해서 다음을 얹는 용도입니다.
+This project builds a Vast.ai-friendly Docker image for running ROS2 Humble and Foxglove on a cheap GPU instance.
+
+It intentionally does **not** include Isaac ROS and does **not** include Isaac Sim.
+
+Included:
 
 - Ubuntu 22.04 / ROS2 Humble
-- Isaac ROS 3.2 workspace scaffold
-- NVIDIA Isaac ROS apt repository `release-3.2`
-- Foxglove Bridge
+- Vast.ai CUDA-capable base image
+- Lightweight XFCE desktop
+- VNC on `5900`
+- noVNC on `6080`
+- Foxglove Bridge on `8765`
+- rosbridge on `9090` if you choose to use it
 - CycloneDDS
-- Isaac Sim 5.1은 포함하지 않음. Vast 데스크탑 안에서 따로 설치하세요.
+- Helper scripts
 
-## 왜 이렇게 구성했나
+Not included:
 
-Vast.ai 일반 Docker instance 안에서 다시 Docker를 띄우는 Docker-in-Docker 구조를 피하기 위해, ROS2/Isaac ROS/Foxglove를 하나의 top-level container 안에 설치합니다.
+- Isaac ROS
+- Isaac Sim 5.1
+- Isaac Sim WebRTC / UDP setup
 
-권장 운영:
+## Architecture
+
+Recommended runtime layout:
 
 ```text
-터미널 A: Isaac Sim 5.1 실행
-- /opt/ros/humble/setup.bash source 하지 않음
-- 필요 시 isaac_clean_shell.sh 사용
-
-터미널 B: ROS2 / Isaac ROS / Foxglove 실행
-- ros_humble_shell.sh 사용
-- start_foxglove.sh 실행
+same Vast container
+├── Isaac Sim 5.1 installed manually later in /workspace/isaacsim
+├── ROS2 Humble installed in this image
+├── your ROS2 workspace at /workspaces/ros2_ws
+├── Foxglove Bridge on 8765/TCP
+└── desktop/noVNC for GUI access
 ```
 
-## 1. Ubuntu 22.04 Vast desktop tag 확인
+Recommended terminal split:
 
-Vast/Linux Desktop의 정확한 Ubuntu 22.04 tag는 환경에 따라 다를 수 있습니다.
+```text
+Terminal A: Isaac Sim 5.1
+- use isaac_clean_shell.sh
+- do not source /opt/ros/humble/setup.bash here
 
-Dockerfile 기본값은 아래입니다.
+Terminal B: ROS2 / Foxglove
+- use ros_humble_shell.sh
+- run start_foxglove.sh
+```
+
+## Build image
+
+Default base image:
 
 ```dockerfile
-ARG BASE_IMAGE=vastai/linux-desktop:ubuntu22.04
+ARG BASE_IMAGE=vastai/base-image:cuda-12.8.1-cudnn-devel-ubuntu22.04
 ```
 
-이 tag가 없으면 Docker Hub 또는 Vast template에서 실제 Ubuntu 22.04 tag를 확인한 뒤 build argument로 넣으세요.
-
-```bash
-docker build \
-  --build-arg BASE_IMAGE=vastai/linux-desktop:<UBUNTU_22_04_TAG> \
-  -t <dockerhub-id>/isaac-ros32-desktop:ubuntu22 .
-```
-
-## 2. 빌드
-
-Docker Hub 예시:
-
-```bash
-docker login
-
-docker build \
-  --build-arg BASE_IMAGE=vastai/linux-desktop:<UBUNTU_22_04_TAG> \
-  -t <dockerhub-id>/isaac-ros32-desktop:ubuntu22 .
-
-docker push <dockerhub-id>/isaac-ros32-desktop:ubuntu22
-```
-
-GHCR 예시:
-
-```bash
-docker login ghcr.io
-
-docker build \
-  --build-arg BASE_IMAGE=vastai/linux-desktop:<UBUNTU_22_04_TAG> \
-  -t ghcr.io/<github-id>/isaac-ros32-desktop:ubuntu22 .
-
-docker push ghcr.io/<github-id>/isaac-ros32-desktop:ubuntu22
-```
-
-## 3. Vast.ai Custom Template
-
-기존 Vast `Linux Desktop` 템플릿을 복사해서 다음만 바꾸는 것을 추천합니다.
+GHCR target image:
 
 ```text
-Image Path:Tag = <dockerhub-id>/isaac-ros32-desktop:ubuntu22
+ghcr.io/dingdongdengdong/isaac-ros32-desktop:ubuntu22
 ```
 
-기존 desktop template의 launch mode, env, entrypoint는 최대한 유지하세요.
+The name still says `isaac-ros32-desktop` for continuity, but the image is now ROS2 Humble only. You may rename the workflow input to something like `ros2-humble-vast-desktop` if desired.
 
-추가 포트:
+## GitHub Actions build
+
+Go to:
+
+```text
+Actions
+→ Build and push Docker image to GHCR
+→ Run workflow
+```
+
+Use default values:
+
+```text
+base_image: vastai/base-image:cuda-12.8.1-cudnn-devel-ubuntu22.04
+image_name: isaac-ros32-desktop
+```
+
+Expected output:
+
+```text
+ghcr.io/dingdongdengdong/isaac-ros32-desktop:ubuntu22
+```
+
+## Vast.ai Custom Template
+
+Use the built GHCR image as the image path:
+
+```text
+ghcr.io/dingdongdengdong/isaac-ros32-desktop:ubuntu22
+```
+
+Recommended Docker Options:
 
 ```bash
--p 8765:8765/tcp
+-p 5900:5900/tcp \
+-p 6080:6080/tcp \
+-p 8765:8765/tcp \
+-p 9090:9090/tcp
 ```
 
-Foxglove는 direct port보다 SSH tunnel이 더 안전합니다.
+Port meaning:
+
+```text
+5900  VNC
+6080  noVNC web desktop
+8765  Foxglove Bridge
+9090  rosbridge websocket, optional
+```
+
+Foxglove through SSH tunnel is still recommended:
 
 ```bash
 ssh -p <VAST_SSH_PORT> root@<VAST_IP> -L 8765:localhost:8765
 ```
 
-Foxglove에서:
+Then connect Foxglove to:
 
 ```text
 ws://localhost:8765
 ```
 
-## 4. 컨테이너 안에서 확인
+## Container commands
+
+Verify ROS/GPU:
 
 ```bash
 verify_ros_gpu.sh
 ```
 
-ROS shell:
+Open ROS2 shell:
 
 ```bash
 ros_humble_shell.sh
 ```
 
-Foxglove bridge:
+Start Foxglove Bridge:
 
 ```bash
 start_foxglove.sh
 ```
 
-Isaac Sim 실행용 clean shell:
+Open clean shell for Isaac Sim:
 
 ```bash
 isaac_clean_shell.sh
 ```
 
-## 5. Isaac ROS 패키지 설치/빌드
-
-기본 이미지에는 Isaac ROS Common workspace scaffold만 들어 있습니다.
-
-사용 가능한 apt 패키지 확인:
+Build your ROS2 workspace:
 
 ```bash
-apt-cache search ros-humble-isaac
+build_ros2_ws.sh
 ```
 
-예시:
+## Isaac Sim note
 
-```bash
-sudo apt-get update
-sudo apt-get install -y ros-humble-isaac-ros-apriltag
+Isaac Sim 5.1 is best installed manually later inside `/workspace` or an attached Vast volume, for example:
+
+```text
+/workspace/isaacsim
+/workspace/ros2_ws
+/workspace/data
 ```
 
-Source build 방식:
-
-```bash
-cd /workspaces/isaac_ros-dev/src
-# 필요한 Isaac ROS repo clone
-# 예: git clone -b release-3.2 https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_apriltag.git
-
-cd /workspaces/isaac_ros-dev
-build_isaac_ros_ws.sh
-```
-
-## 주의
-
-- Isaac ROS 3.2는 Ubuntu 22.04 / ROS2 Humble 계열에 맞습니다.
-- Isaac ROS 4.x는 Ubuntu 24.04 / Jazzy 계열입니다.
-- Isaac Sim 5.1은 Python 3.11 기반이므로 ROS2 Humble Python 3.10 환경과 한 터미널에서 섞지 마세요.
-- Isaac Sim 실행용 터미널과 ROS2/Isaac ROS 실행용 터미널을 분리하세요.
+This avoids rebuilding a huge Docker image whenever Isaac Sim changes. Isaac Sim 5.1 uses Python 3.11, while ROS2 Humble on Ubuntu 22.04 uses Python 3.10, so keep Isaac Sim and ROS2 shells separate.
