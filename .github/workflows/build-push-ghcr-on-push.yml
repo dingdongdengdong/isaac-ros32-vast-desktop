@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       base_image:
-        description: "Ubuntu 22.04 Vast desktop base image tag"
+        description: "Ubuntu 22.04 Vast base image tag"
         required: true
-        default: "vastai/linux-desktop:ubuntu22.04"
+        default: "vastai/base-image:cuda-12.8.1-cudnn-devel-ubuntu22.04"
       image_name:
         description: "Image name"
         required: true
@@ -30,7 +30,7 @@ jobs:
         run: |
           BASE_IMAGE="${{ github.event.inputs.base_image }}"
           IMAGE_NAME="${{ github.event.inputs.image_name }}"
-          if [ -z "$BASE_IMAGE" ]; then BASE_IMAGE="vastai/linux-desktop:ubuntu22.04"; fi
+          if [ -z "$BASE_IMAGE" ]; then BASE_IMAGE="vastai/base-image:cuda-12.8.1-cudnn-devel-ubuntu22.04"; fi
           if [ -z "$IMAGE_NAME" ]; then IMAGE_NAME="isaac-ros32-desktop"; fi
           echo "base_image=$BASE_IMAGE" >> "$GITHUB_OUTPUT"
           echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
