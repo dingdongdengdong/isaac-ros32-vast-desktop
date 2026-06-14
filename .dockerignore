@@ -1,0 +1,7 @@
+.git
+.gitignore
+*.zip
+build/
+install/
+log/
+__pycache__/
