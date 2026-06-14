@@ -1,0 +1,43 @@
+name: Build and push Docker image to GHCR
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_image:
+        description: "Ubuntu 22.04 Vast desktop base image tag"
+        required: true
+        default: "vastai/linux-desktop:ubuntu22.04"
+      image_name:
+        description: "Image name"
+        required: true
+        default: "isaac-ros32-desktop"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase owner
+        id: owner
+        run: echo "owner_lc=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ github.event.inputs.base_image }}
+          tags: ghcr.io/${{ steps.owner.outputs.owner_lc }}/${{ github.event.inputs.image_name }}:ubuntu22
