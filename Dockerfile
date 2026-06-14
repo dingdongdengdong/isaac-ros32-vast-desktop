@@ -23,8 +23,8 @@ RUN source /etc/os-release && \
     echo "Detected Ubuntu codename: ${VERSION_CODENAME}" && \
     test "${VERSION_CODENAME}" = "jammy"
 
-# Core Ubuntu tools only. Keep ROS/colcon/rosdep packages out of this layer;
-# those are installed after adding the ROS2 apt repository.
+# Core Ubuntu tools only. Do not reinstall supervisor here: Vast base-image already
+# has supervisor and reinstalling it triggers an interactive conffile prompt.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     locales \
     curl \
@@ -46,7 +46,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     python3-dev \
-    supervisor \
     && locale-gen en_US en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
