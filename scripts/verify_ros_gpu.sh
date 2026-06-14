@@ -24,13 +24,13 @@ export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}"
 echo "RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION}"
 
 echo
-echo "=== Isaac ROS workspace ==="
-echo "${ISAAC_ROS_WS:-/workspaces/isaac_ros-dev}"
-ls -la "${ISAAC_ROS_WS:-/workspaces/isaac_ros-dev}/src" || true
+echo "=== ROS2 workspace ==="
+echo "${ROS_WS:-/workspaces/ros2_ws}"
+ls -la "${ROS_WS:-/workspaces/ros2_ws}/src" || true
 
 echo
-echo "=== Isaac ROS apt packages available? ==="
-apt-cache search ros-humble-isaac | head -50 || true
+echo "=== Foxglove Bridge ==="
+ros2 pkg prefix foxglove_bridge || true
 
 echo
 echo "Done."
