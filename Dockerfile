@@ -23,7 +23,8 @@ RUN source /etc/os-release && \
     echo "Detected Ubuntu codename: ${VERSION_CODENAME}" && \
     test "${VERSION_CODENAME}" = "jammy"
 
-# Base tools + lightweight desktop/noVNC stack
+# Core Ubuntu tools only. Keep ROS/colcon/rosdep packages out of this layer;
+# those are installed after adding the ROS2 apt repository.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     locales \
     curl \
@@ -45,11 +46,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-venv \
     python3-dev \
-    python3-colcon-common-extensions \
-    python3-rosdep \
-    python3-vcstool \
-    python3-argcomplete \
     supervisor \
+    && locale-gen en_US en_US.UTF-8 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Enable Ubuntu universe before installing desktop/noVNC packages.
+RUN add-apt-repository universe -y && \
+    apt-get update && apt-get install -y --no-install-recommends \
     dbus-x11 \
     x11-xserver-utils \
     xvfb \
@@ -58,7 +61,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     websockify \
     xfce4 \
     xfce4-terminal \
-    && locale-gen en_US en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
 # Lightweight desktop launcher. Vast base-image normally boots supervisord;
@@ -99,13 +101,16 @@ stdout_logfile=/var/log/desktop.log
 stderr_logfile=/var/log/desktop.err
 EOF
 
-# ROS2 Humble apt repository and packages
-RUN add-apt-repository universe -y && \
-    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+# ROS2 Humble apt repository and packages.
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
       -o /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu jammy main" \
       > /etc/apt/sources.list.d/ros2.list && \
     apt-get update && apt-get install -y --no-install-recommends \
+      python3-colcon-common-extensions \
+      python3-rosdep \
+      python3-vcstool \
+      python3-argcomplete \
       ros-humble-ros-base \
       ros-humble-demo-nodes-cpp \
       ros-humble-demo-nodes-py \
