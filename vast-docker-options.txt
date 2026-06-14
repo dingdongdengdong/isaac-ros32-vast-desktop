@@ -1,0 +1,12 @@
+# Suggested additional Vast Docker Options.
+# Keep the original options from Vast Linux Desktop template, then add Foxglove:
+-p 8765:8765/tcp
+
+# Common desktop ports are normally already in the template.
+# If you need to add manually:
+# -p 5900:5900/tcp
+# -p 6080:6080/tcp
+
+# SSH tunnel for Foxglove is recommended:
+# ssh -p <VAST_SSH_PORT> root@<VAST_IP> -L 8765:localhost:8765
+# Foxglove: ws://localhost:8765
