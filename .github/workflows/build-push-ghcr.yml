@@ -10,7 +10,7 @@ on:
       image_name:
         description: "Image name"
         required: true
-        default: "isaac-ros32-desktop"
+        default: "ros2-humble-vast-desktop"
 
 jobs:
   build:
